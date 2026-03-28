@@ -1,2 +1,615 @@
 # pixai-prompt-maker
 日本語で入力すると、pixai向けの英語プロンプトを生成してくれるツール
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pixai プロンプトジェネレーター</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;700;900&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --card: #1a1a26;
+    --border: #2a2a3e;
+    --accent: #c084fc;
+    --accent2: #818cf8;
+    --accent3: #f472b6;
+    --text: #e2e0f0;
+    --muted: #6b6880;
+    --success: #34d399;
+    --glow: 0 0 20px rgba(192, 132, 252, 0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 400px;
+    background: radial-gradient(ellipse, rgba(192,132,252,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding-top: 16px;
+  }
+
+  .logo-tag {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 3px 10px;
+    margin-bottom: 14px;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-size: clamp(22px, 5vw, 36px);
+    font-weight: 900;
+    line-height: 1.2;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--accent3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    transition: border-color 0.2s;
+  }
+
+  .card:focus-within {
+    border-color: rgba(192,132,252,0.4);
+    box-shadow: var(--glow);
+  }
+
+  .card-full { grid-column: 1 / -1; }
+
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .label-note {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    margin-left: 6px;
+  }
+
+  input, textarea, select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    resize: vertical;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 2px rgba(129,140,248,0.12);
+  }
+
+  select option { background: var(--card); }
+
+  .tag-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tag {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    color: var(--muted);
+  }
+
+  .tag:hover { border-color: var(--accent2); color: var(--text); }
+  .tag.active {
+    background: rgba(192,132,252,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .generate-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+
+  .generate-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(192,132,252,0.3);
+  }
+
+  .generate-btn:active { transform: translateY(0); }
+  .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .result-section {
+    margin-top: 28px;
+    display: none;
+  }
+
+  .result-section.visible { display: block; }
+
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .result-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent3);
+  }
+
+  .copy-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    transition: all 0.15s;
+  }
+
+  .copy-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+  .copy-btn.copied { border-color: var(--success); color: var(--success); }
+
+  .prompt-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 80px;
+  }
+
+  .prompt-box .pos { color: #86efac; }
+  .prompt-box .neg-label { color: var(--accent3); display: block; margin-top: 12px; font-weight: 700; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all 0.15s;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .tab.active {
+    background: rgba(192,132,252,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 18px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 14px 0;
+  }
+
+  .hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+
+  .scene-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .preset-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+
+  .preset-btn:hover { border-color: var(--accent2); color: var(--text); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo-tag">PIXAI PROMPT GEN</div>
+    <h1>キャラクタープロンプト<br>ジェネレーター</h1>
+    <p class="subtitle">キャラ設定を入力するだけで pixai 最適化プロンプトを自動生成</p>
+  </header>
+
+  <!-- 基本設定 -->
+  <div class="grid">
+    <div class="card">
+      <label>キャラクター名</label>
+      <input type="text" id="charName" placeholder="例：氷室恭介、朝比奈ハル…">
+    </div>
+    <div class="card">
+      <label>世界観 / プロジェクト</label>
+      <input type="text" id="worldName" placeholder="例：Shabon-verse、仮面婚…">
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <label>髪色・髪型</label>
+      <input type="text" id="hair" placeholder="例：シルバー ロング、黒髪 ショート">
+    </div>
+    <div class="card">
+      <label>目の色・特徴</label>
+      <input type="text" id="eyes" placeholder="例：金色 鋭い、紫 垂れ目">
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <label>体型・身長イメージ</label>
+      <input type="text" id="body" placeholder="例：長身 細身、小柄 華奢">
+    </div>
+    <div class="card">
+      <label>肌の色</label>
+      <input type="text" id="skin" placeholder="例：色白、小麦色、青白い">
+    </div>
+  </div>
+
+  <!-- 衣装 -->
+  <div class="card" style="margin-bottom:14px">
+    <label>衣装・服装</label>
+    <input type="text" id="outfit" placeholder="例：黒いスーツ ネクタイ、制服 乱れた、白衣">
+  </div>
+
+  <!-- 雰囲気・キャラ属性 -->
+  <div class="card" style="margin-bottom:14px">
+    <label>キャラクターの雰囲気・属性 <span class="label-note">複数選択可</span></label>
+    <div class="tag-group" id="vibes">
+      <span class="tag" data-val="cold and serious">クール系</span>
+      <span class="tag" data-val="dangerous aura">危険オーラ</span>
+      <span class="tag" data-val="gentle smile">優しい微笑み</span>
+      <span class="tag" data-val="obsessive gaze">執着した目線</span>
+      <span class="tag" data-val="playful smirk">いたずらな笑み</span>
+      <span class="tag" data-val="melancholic expression">憂い顔</span>
+      <span class="tag" data-val="arrogant look">傲慢な表情</span>
+      <span class="tag" data-val="mysterious aura">ミステリアス</span>
+      <span class="tag" data-val="yandere eyes">ヤンデレ</span>
+      <span class="tag" data-val="sweet but hiding something">甘い毒</span>
+    </div>
+  </div>
+
+  <!-- 用途 -->
+  <div class="card" style="margin-bottom:14px">
+    <label>生成目的 <span class="label-note">最適なサイズ・構図をAIが判断</span></label>
+    <div class="tag-group" id="purpose">
+      <span class="tag active" data-val="thumbnail">サムネイル</span>
+      <span class="tag" data-val="profile_icon">プロフアイコン</span>
+      <span class="tag" data-val="scene">シーン立ち絵</span>
+      <span class="tag" data-val="full_body">全身イラスト</span>
+    </div>
+  </div>
+
+  <!-- シーン -->
+  <div class="card" style="margin-bottom:14px">
+    <label>シーン・背景 <span class="label-note">任意</span></label>
+    <input type="text" id="scene" placeholder="例：夜の都市、病院の廊下、和室…">
+    <div class="scene-presets">
+      <button class="preset-btn" onclick="setScene('night city, neon lights, rain')">夜の都市</button>
+      <button class="preset-btn" onclick="setScene('hospital corridor, cold light')">病院廊下</button>
+      <button class="preset-btn" onclick="setScene('traditional japanese room')">和室</button>
+      <button class="preset-btn" onclick="setScene('rooftop, sunset sky')">屋上・夕焼け</button>
+      <button class="preset-btn" onclick="setScene('luxury office, large window')">高級オフィス</button>
+      <button class="preset-btn" onclick="setScene('white studio, simple background')">白背景</button>
+    </div>
+  </div>
+
+  <!-- 追加メモ -->
+  <div class="card" style="margin-bottom:18px">
+    <label>追加情報・こだわり <span class="label-note">自由記述</span></label>
+    <textarea id="extra" rows="3" placeholder="例：傷あり、タトゥー、メガネ、Zeta向けサムネなので顔アップ優先…"></textarea>
+  </div>
+
+  <button class="generate-btn" id="genBtn" onclick="generate()">
+    ✦ プロンプトを生成する
+  </button>
+
+  <!-- 結果 -->
+  <div class="result-section" id="resultSection">
+    <div class="divider"></div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('result')">生成プロンプト</div>
+      <div class="tab" onclick="switchTab('tips')">使い方ヒント</div>
+    </div>
+
+    <div class="tab-content active" id="tab-result">
+      <div class="result-header">
+        <span class="result-title">✦ Positive Prompt</span>
+        <button class="copy-btn" id="copyPos" onclick="copyText('posPrompt', 'copyPos')">COPY</button>
+      </div>
+      <div class="prompt-box" id="posPrompt"></div>
+
+      <div class="result-header" style="margin-top:16px">
+        <span class="result-title" style="color:var(--accent3)">✦ Negative Prompt</span>
+        <button class="copy-btn" id="copyNeg" onclick="copyText('negPrompt', 'copyNeg')">COPY</button>
+      </div>
+      <div class="prompt-box" id="negPrompt"></div>
+
+      <div class="result-header" style="margin-top:16px">
+        <span class="result-title" style="color:var(--accent2)">✦ 推奨設定</span>
+      </div>
+      <div class="prompt-box" id="settings" style="font-size:12px; line-height:2"></div>
+    </div>
+
+    <div class="tab-content" id="tab-tips">
+      <div class="prompt-box" id="tipsBox" style="font-size:12px; line-height:2"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // タグ選択
+  document.querySelectorAll('.tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      const group = tag.closest('.tag-group');
+      const id = group.id;
+      if (id === 'purpose') {
+        group.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+        tag.classList.add('active');
+      } else {
+        tag.classList.toggle('active');
+      }
+    });
+  });
+
+  function setScene(val) {
+    document.getElementById('scene').value = val;
+  }
+
+  function getSelected(groupId) {
+    return [...document.querySelectorAll(`#${groupId} .tag.active`)]
+      .map(t => t.dataset.val).join(', ');
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active', ['result','tips'][i] === name);
+    });
+    document.querySelectorAll('.tab-content').forEach(c => {
+      c.classList.toggle('active', c.id === `tab-${name}`);
+    });
+  }
+
+  async function generate() {
+    const btn = document.getElementById('genBtn');
+    const resultSection = document.getElementById('resultSection');
+
+    const charName = document.getElementById('charName').value;
+    const worldName = document.getElementById('worldName').value;
+    const hair = document.getElementById('hair').value;
+    const eyes = document.getElementById('eyes').value;
+    const body = document.getElementById('body').value;
+    const skin = document.getElementById('skin').value;
+    const outfit = document.getElementById('outfit').value;
+    const vibes = getSelected('vibes');
+    const purpose = getSelected('purpose');
+    const scene = document.getElementById('scene').value;
+    const extra = document.getElementById('extra').value;
+
+    if (!hair && !eyes && !outfit) {
+      alert('最低限、髪・目・衣装のいずれかを入力してください。');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '✦ 生成中…';
+    resultSection.classList.remove('visible');
+
+    document.getElementById('posPrompt').innerHTML = '<div class="loading"><div class="spinner"></div>AIがプロンプトを最適化中…</div>';
+    document.getElementById('negPrompt').innerHTML = '';
+    document.getElementById('settings').innerHTML = '';
+    document.getElementById('tipsBox').innerHTML = '';
+    resultSection.classList.add('visible');
+
+    const purposeLabel = {
+      thumbnail: 'Zeta用サムネイル（縦長・顔アップ・インパクト重視）',
+      profile_icon: 'プロフィールアイコン（正方形・バストアップ）',
+      scene: 'シーン立ち絵（全身〜バスト・背景あり）',
+      full_body: '全身イラスト（縦長・全身表示）'
+    }[purpose] || purpose;
+
+    const systemPrompt = `あなたはpixaiでアニメスタイルのキャラクターイラストを生成するための専門プロンプトエンジニアです。
+以下のルールを厳守してください：
+- positive promptは英語のタグ形式（カンマ区切り）で出力
+- negative promptも英語タグ形式で出力
+- 推奨設定（Steps, CFG, Sampler, LoRA等）は日本語で箇条書き
+- 使い方ヒントは日本語で箇条書き（3〜5点）
+- 出力はJSON形式のみ。マークダウンコードブロック不要。以下のキーを持つオブジェクト：
+  {"positive": "...", "negative": "...", "settings": "...", "tips": "..."}`;
+
+    const userPrompt = `以下のキャラクター情報からpixai向け画像生成プロンプトを生成してください。
+
+キャラクター名: ${charName || '未設定'}
+世界観: ${worldName || '未設定'}
+髪色・髪型: ${hair || '未設定'}
+目の色・特徴: ${eyes || '未設定'}
+体型・身長: ${body || '未設定'}
+肌の色: ${skin || '未設定'}
+衣装: ${outfit || '未設定'}
+雰囲気・属性: ${vibes || '未設定'}
+生成目的: ${purposeLabel}
+シーン・背景: ${scene || '任意'}
+追加情報: ${extra || 'なし'}
+
+目的に合わせて構図・画角の指示もpositiveプロンプトに含めてください。
+quality系タグ（masterpiece, best quality等）も忘れずに含めること。`;
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        })
+      });
+
+      const data = await res.json();
+      const raw = data.content[0].text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(raw);
+
+      document.getElementById('posPrompt').textContent = parsed.positive;
+      document.getElementById('negPrompt').textContent = parsed.negative;
+      document.getElementById('settings').textContent = parsed.settings;
+      document.getElementById('tipsBox').textContent = parsed.tips;
+
+    } catch(e) {
+      document.getElementById('posPrompt').textContent = 'エラーが発生しました。もう一度試してください。\n' + e.message;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '✦ プロンプトを生成する';
+  }
+
+  async function copyText(elemId, btnId) {
+    const text = document.getElementById(elemId).textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById(btnId);
+      btn.textContent = 'COPIED!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 2000);
+    } catch(e) {}
+  }
+</script>
+</body>
+</html>
